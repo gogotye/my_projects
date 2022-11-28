@@ -1,4 +1,4 @@
-from loader import bot
+from loader import bo
 import handlers
 from utils.set_bot_commands import set_default_commands
 
