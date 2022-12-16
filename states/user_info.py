@@ -10,3 +10,9 @@ class Info(StatesGroup):
 
     req_photo = State()
     photo_limit = State()
+
+    max_distance = State()
+    min_distance = State()
+
+    max_price = State()
+    min_price = State()

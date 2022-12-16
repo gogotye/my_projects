@@ -3,14 +3,14 @@ from database.hotels_data import hotels_data
 from database.users_data import users
 from loader import bot
 from telebot.types import Message, InputMediaPhoto
-from utils.request_func import search_request, search_id, list_request, detail_request, display_hotel_info, func, \
-    save_hotel_data
+from utils.request_func import search_request, search_id, list_request, detail_request, func, save_hotel_data, \
+    display_hotel_info
 from config_data.config import RAPID_API_KEY
 
 
-def low_price_send_data(message: Message) -> None:
-    count = 0
+def high_price_send_data(message: Message) -> None:
     hotels = users[message.from_user.id]["hotels_limit"]
+    count = 0
     bot.send_message(message.chat.id, 'Идёт сбор данных пожалуйста подождите...')
     bot.send_message(message.chat.id, f'Прогресс по отелям: {count} из {hotels}')
 
@@ -21,11 +21,11 @@ def low_price_send_data(message: Message) -> None:
     list_res = list_request(check_in_date=users[message.from_user.id]['check_in'],
                             check_out_date=users[message.from_user.id]['check_out'],
                             region_id=users[message.from_user.id]['city_id'],
-                            hotels_limit=users[message.from_user.id]['hotels_limit'],
-                            sort='PRICE_LOW_TO_HIGH',
+                            hotels_limit=hotels,
+                            sort='RECOMMENDED',
                             key=RAPID_API_KEY)
 
-    final_list = []
+    sort_list = []
     flag = True if 'photo_limit' in users[message.from_user.id] else False
     imgs = users[message.from_user.id]['photo_limit'] if flag else None
 
@@ -44,15 +44,21 @@ def low_price_send_data(message: Message) -> None:
 
         lst = []
         if flag:
-            lst = ([(k[0], k[1]) for k in data[6]] if len(hotels_data[id]['images']) > 10 else [InputMediaPhoto(media=p[0]) for p in data[6]])\
+            lst = (
+                [(k[0], k[1]) for k in data[6]] if len(hotels_data[id]['images']) > 10 else [InputMediaPhoto(media=p[0])
+                                                                                             for p in data[6]]) \
                 if flag else []
 
-        final_list.append((hotels_data[id], lst))
+        hotels_data[id] = save_hotel_data(cur_hotel_data=data, flag=flag)
+
+        sort_list.append((hotels_data[id], lst))
 
         count += 1
         bot.send_message(message.chat.id, f'Прогресс по отелям: {count} из {hotels}')
 
-    for elem in final_list:
+    sort_list.sort(key=lambda x: x[0]['per_night'], reverse=True)
+
+    for elem in sort_list:
         try:
             if flag and 0 < len(elem[1]) <= 10:
                 bot.send_message(message.chat.id, display_hotel_info(hotel_data=elem[0]))
@@ -67,4 +73,4 @@ def low_price_send_data(message: Message) -> None:
         except Exception as ex:
             pass
 
-    final_list.clear()
+    sort_list.clear()
