@@ -3,7 +3,10 @@ from typing import Any, List, Tuple
 import requests
 import re
 
+from telebot.types import Message
+
 from database.users_data import users
+from loader import bot
 
 
 def search_request(city: str, key: str) -> Any:
@@ -182,11 +185,15 @@ def save_hotel_data(cur_hotel_data: tuple, flag: bool) -> dict:
     return hotel_db
 
 
-def from_dict_to_str(hotels: dict) -> str:
+def from_dict_to_str(hotels: dict) -> Any:
     lst = []
-    for i in hotels:
-        lst.append(hotels[i]['name'])
-    return ', '.join(lst)
+    try:
+        for i in hotels:
+            lst.append(hotels[i]['name'])
+    except KeyError:
+        return "Ничего не найдено"
+    else:
+        return ', '.join(lst)
 
 
 def time() -> str:
@@ -199,3 +206,24 @@ def db_answer(info: Tuple[int, str, str, str]):
            f'Найденные отели: {info[3]}'
 
 
+def check_message(message):
+    return (
+            message.text == 'Все данные введены правильно' or
+            message.text == 'Начать заново'
+    )
+
+
+def display_final_info(message: Message, flag: bool, hotel_info: dict, photo_info: list):
+    try:
+        if flag:
+            bot.send_message(message.chat.id, display_hotel_info(hotel_data=hotel_info))
+            bot.send_media_group(chat_id=message.chat.id, media=photo_info, disable_notification=True)
+        else:
+            bot.send_message(message.chat.id, display_hotel_info(hotel_data=hotel_info))
+    except Exception:
+        pass
+
+
+def empty_or_not(message: Message, lst: list):
+    if len(lst) == 0:
+        bot.send_message(message.chat.id, 'Ничего не найдено')

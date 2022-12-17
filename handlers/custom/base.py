@@ -4,13 +4,14 @@ from handlers.custom.lowprice import low_price_send_data
 from handlers.custom.highprice import high_price_send_data
 from handlers.custom.history import add_value
 from loader import bot
-from utils.request_func import display_user_info, from_dict_to_str, time
+from utils.request_func import display_user_info, from_dict_to_str, time, check_message
 from states.user_info import Info
 from telebot.types import Message
 from keyboards.reply.keyboard import keyboard, keyboard_2
 import re
 from handlers.custom import bestdeal
 from datetime import datetime
+from utils.variables import reg_exp_for_city_name, maximum_number_of_cities, reg_exp_for_date, maximum_number_of_photos
 
 
 @bot.message_handler(commands=['lowprice', 'highprice', 'bestdeal'])
@@ -22,7 +23,7 @@ def base(message: Message) -> None:
 
 @bot.message_handler(state=Info.city)
 def city(message: Message) -> None:
-    if not re.fullmatch(r'[A-Z][a-z]+(?:[-\s]?[A-Z][a-z]+)*', message.text):
+    if not re.fullmatch(reg_exp_for_city_name, message.text):
         bot.send_message(message.chat.id, 'Некоректное название города')
     else:
         bot.send_message(message.chat.id, 'Сколько вы бы хотели вывести отелей?\n'
@@ -35,8 +36,8 @@ def city(message: Message) -> None:
 def hotels(message: Message) -> None:
     if not message.text.isdigit():
         bot.send_message(message.chat.id, 'Введите число, пожалуйста')
-    elif int(message.text) > 50:
-        bot.send_message(message.chat.id, 'Не больше 50')
+    elif int(message.text) > maximum_number_of_cities:
+        bot.send_message(message.chat.id, f'Не больше {maximum_number_of_cities}')
     else:
         bot.send_message(message.chat.id, 'Пожалуйста, введите дату въезда в отель.\nФормат: YYYY-MM-DD')
         bot.set_state(message.from_user.id, Info.check_in, message.chat.id)
@@ -45,7 +46,7 @@ def hotels(message: Message) -> None:
 
 @bot.message_handler(state=Info.check_in)
 def check_in(message):
-    match = re.fullmatch(r'\d{4}-\d{2}-\d{2}', message.text)
+    match = re.fullmatch(reg_exp_for_date, message.text)
     try:
         if not match:
             bot.send_message(message.chat.id, 'Неверный формат даты, попробуйте снова')
@@ -60,7 +61,7 @@ def check_in(message):
 
 @bot.message_handler(state=Info.check_out)
 def check_out(message):
-    match = re.fullmatch(r'\d{4}-\d{2}-\d{2}', message.text)
+    match = re.fullmatch(reg_exp_for_date, message.text)
     try:
         if not match:
             bot.send_message(message.chat.id, 'Неверный формат даты, попробуйте снова')
@@ -86,8 +87,8 @@ def check_out(message):
 def photo(message: Message) -> None:
     if message.text == 'Да':
         bot.set_state(message.from_user.id, Info.photo_limit, message.chat.id)
-        bot.send_message(message.chat.id, 'Сколько вы хотите вывести фотографий?\n'
-                                          'Максимум 30')
+        bot.send_message(message.chat.id, f'Сколько вы хотите вывести фотографий?\n'
+                                          f'Максимум {maximum_number_of_photos}')
     elif message.text == 'Нет' and users[message.from_user.id]['command'] == '/bestdeal':
         bot.set_state(message.from_user.id, Info.min_distance, message.chat.id)
         bot.send_message(message.chat.id, 'Укажите минимальную дистанцию от центра\n'
@@ -105,8 +106,8 @@ def photo(message: Message) -> None:
 def get_photo(message: Message) -> None:
     if not message.text.isdigit():
         bot.send_message(message.chat.id, 'Кол-во фотографий должно быть числом')
-    elif int(message.text) > 30:
-        bot.send_message(message.chat.id, 'Не больше 30 фотографий')
+    elif int(message.text) > maximum_number_of_photos:
+        bot.send_message(message.chat.id, f'Не больше {maximum_number_of_photos} фотографий')
     elif users[message.from_user.id]['command'] == '/bestdeal':
         users[message.from_user.id]["photo_limit"] = int(message.text)
         bot.set_state(message.from_user.id, Info.min_distance, message.chat.id)
@@ -120,8 +121,7 @@ def get_photo(message: Message) -> None:
         bot.delete_state(message.from_user.id, message.chat.id)
 
 
-@bot.message_handler(func=lambda message: message.text == 'Все данные введены правильно'
-                     or message.text == 'Начать заново')
+@bot.message_handler(func=check_message)
 def send_data(message: Message) -> None:
     if message.text == 'Все данные введены правильно':
         try:
@@ -135,7 +135,7 @@ def send_data(message: Message) -> None:
             bot.send_message(message.chat.id, 'Что-то пошло не так 😢')
             raise Exception(ex)
         else:
-            hotels_name = from_dict_to_str(hotels=hotels_data) if hotels_data else "Ничего не найдено"
+            hotels_name = from_dict_to_str(hotels=hotels_data)
             add_value(data=(message.from_user.id,
                             users[message.from_user.id]['command'],
                             users[message.from_user.id]['time'],

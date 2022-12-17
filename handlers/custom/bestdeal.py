@@ -6,14 +6,15 @@ from database.users_data import users
 from loader import bot
 from telebot.types import Message, InputMediaPhoto
 from utils.request_func import search_request, search_id, list_request, detail_request, display_user_info, func, \
-    save_hotel_data, display_hotel_info
+    save_hotel_data, display_hotel_info, display_final_info, empty_or_not
 from states.user_info import Info
 from keyboards.reply.keyboard import keyboard_2
+from utils.variables import check_number_for_distance, static_number_of_cities
 
 
 @bot.message_handler(state=Info.min_distance)
 def min_distance(message: Message) -> None:
-    if re.fullmatch(r'\d+(?:\.\d+)?', message.text):
+    if re.fullmatch(check_number_for_distance, message.text):
         users[message.from_user.id]['min_distance'] = float(message.text)
         bot.set_state(message.from_user.id, Info.max_distance, message.chat.id)
         bot.send_message(message.chat.id, 'Ответ записан.\n'
@@ -26,7 +27,7 @@ def min_distance(message: Message) -> None:
 
 @bot.message_handler(state=Info.max_distance)
 def max_distance(message: Message) -> None:
-    if not re.fullmatch(r'\d+(?:\.\d+)?', message.text):
+    if not re.fullmatch(check_number_for_distance, message.text):
         bot.send_message(message.chat.id, f'Число {message.text} не валидно, попробуйте снова')
     elif users[message.from_user.id]['min_distance'] > float(message.text):
         bot.send_message(message.chat.id, 'Минимальная дистанция не может быть больше максимальной.\nПопробуйте снова')
@@ -74,7 +75,7 @@ def bestdeal_send_data(message: Message) -> None:
     list_res = list_request(check_in_date=users[message.from_user.id]['check_in'],
                             check_out_date=users[message.from_user.id]['check_out'],
                             region_id=users[message.from_user.id]['city_id'],
-                            hotels_limit=50,
+                            hotels_limit=static_number_of_cities,
                             sort='DISTANCE',
                             key=RAPID_API_KEY,
                             max_price=users[message.from_user.id]['max_price'],
@@ -117,22 +118,13 @@ def bestdeal_send_data(message: Message) -> None:
 
         if len(final_list) == int(users[message.from_user.id]['hotels_limit']):
             break
+
+    empty_or_not(message=message, lst=final_list)
+
     final_list.sort(key=lambda x: x[0]['from_center'][0])
 
     for elem in final_list:
-        try:
-            if flag and 0 < len(elem[1]) <= 10:
-                bot.send_message(message.chat.id, display_hotel_info(hotel_data=elem[0]))
-                bot.send_media_group(chat_id=message.chat.id, media=elem[1], disable_notification=True)
-            elif flag and len(elem[1]) > 10:
-                bot.send_message(message.chat.id, display_hotel_info(hotel_data=elem[0]))
-                for url, description in elem[1]:
-                    bot.send_message(message.chat.id, description, disable_notification=True)
-                    bot.send_photo(chat_id=message.chat.id, photo=url, disable_notification=True)
-            else:
-                bot.send_message(message.chat.id, display_hotel_info(hotel_data=elem[0]))
-        except Exception as ex:
-            pass
+        display_final_info(message=message, flag=flag, hotel_info=elem[0], photo_info=elem[1])
 
     final_list.clear()
 

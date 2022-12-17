@@ -4,7 +4,7 @@ from database.users_data import users
 from loader import bot
 from telebot.types import Message, InputMediaPhoto
 from utils.request_func import search_request, search_id, list_request, detail_request, func, save_hotel_data, \
-    display_hotel_info
+    display_hotel_info, display_final_info, empty_or_not
 from config_data.config import RAPID_API_KEY
 
 
@@ -56,21 +56,11 @@ def high_price_send_data(message: Message) -> None:
         count += 1
         bot.send_message(message.chat.id, f'Прогресс по отелям: {count} из {hotels}')
 
+    empty_or_not(message=message, lst=sort_list)
+
     sort_list.sort(key=lambda x: x[0]['per_night'], reverse=True)
 
     for elem in sort_list:
-        try:
-            if flag and 0 < len(elem[1]) <= 10:
-                bot.send_message(message.chat.id, display_hotel_info(hotel_data=elem[0]))
-                bot.send_media_group(chat_id=message.chat.id, media=elem[1], disable_notification=True)
-            elif flag and len(elem[1]) > 10:
-                bot.send_message(message.chat.id, display_hotel_info(hotel_data=elem[0]))
-                for url, description in elem[1]:
-                    bot.send_message(message.chat.id, description, disable_notification=True)
-                    bot.send_photo(chat_id=message.chat.id, photo=url, disable_notification=True)
-            else:
-                bot.send_message(message.chat.id, display_hotel_info(hotel_data=elem[0]))
-        except Exception as ex:
-            pass
+        display_final_info(message=message, flag=flag, hotel_info=elem[0], photo_info=elem[1])
 
     sort_list.clear()
