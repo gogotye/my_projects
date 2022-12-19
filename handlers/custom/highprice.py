@@ -2,21 +2,17 @@ import json
 from database.hotels_data import hotels_data
 from database.users_data import users
 from loader import bot
-from telebot.types import Message, InputMediaPhoto
-from utils.request_func import search_request, search_id, list_request, detail_request, func, save_hotel_data, \
-    display_hotel_info, display_final_info, empty_or_not
+from telebot.types import Message, InputMediaPhoto, ReplyKeyboardRemove
+from utils.request_func import list_request, detail_request, func, save_hotel_data, \
+    display_final_info, empty_or_not
 from config_data.config import RAPID_API_KEY
 
 
 def high_price_send_data(message: Message) -> None:
     hotels = users[message.from_user.id]["hotels_limit"]
     count = 0
-    bot.send_message(message.chat.id, 'Идёт сбор данных пожалуйста подождите...')
+    bot.send_message(message.chat.id, 'Идёт сбор данных пожалуйста подождите...', reply_markup=ReplyKeyboardRemove())
     bot.send_message(message.chat.id, f'Прогресс по отелям: {count} из {hotels}')
-
-    search_res = search_request(city=users[message.from_user.id]['city'],
-                                key=RAPID_API_KEY)
-    users[message.from_user.id]['city_id'] = search_id(search_res)
 
     list_res = list_request(check_in_date=users[message.from_user.id]['check_in'],
                             check_out_date=users[message.from_user.id]['check_out'],
@@ -44,12 +40,7 @@ def high_price_send_data(message: Message) -> None:
 
         lst = []
         if flag:
-            lst = (
-                [(k[0], k[1]) for k in data[6]] if len(hotels_data[id]['images']) > 10 else [InputMediaPhoto(media=p[0])
-                                                                                             for p in data[6]]) \
-                if flag else []
-
-        hotels_data[id] = save_hotel_data(cur_hotel_data=data, flag=flag)
+            lst = [InputMediaPhoto(media=p[0]) for p in data[6]] if flag else []
 
         sort_list.append((hotels_data[id], lst))
 

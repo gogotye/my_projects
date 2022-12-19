@@ -4,14 +4,15 @@ from handlers.custom.lowprice import low_price_send_data
 from handlers.custom.highprice import high_price_send_data
 from handlers.custom.history import add_value
 from loader import bot
-from utils.request_func import display_user_info, from_dict_to_str, time, check_message
+from utils.request_func import display_user_info, from_dict_to_str, time, check_message, search_request
 from states.user_info import Info
-from telebot.types import Message
+from telebot.types import Message, ReplyKeyboardRemove
 from keyboards.reply.keyboard import keyboard, keyboard_2
 import re
 from handlers.custom import bestdeal
 from datetime import datetime
 from utils.variables import reg_exp_for_city_name, maximum_number_of_cities, reg_exp_for_date, maximum_number_of_photos
+from config_data.config import RAPID_API_KEY
 
 
 @bot.message_handler(commands=['lowprice', 'highprice', 'bestdeal'])
@@ -23,13 +24,17 @@ def base(message: Message) -> None:
 
 @bot.message_handler(state=Info.city)
 def city(message: Message) -> None:
+    request = search_request(city=message.text, key=RAPID_API_KEY)
     if not re.fullmatch(reg_exp_for_city_name, message.text):
         bot.send_message(message.chat.id, 'Некоректное название города')
+    elif not request:
+        bot.send_message(message.chat.id, 'Такого города на сайте не найдено')
     else:
         bot.send_message(message.chat.id, 'Сколько вы бы хотели вывести отелей?\n'
                                           'Максимум 50')
         bot.set_state(message.from_user.id, Info.hotels_limit, message.chat.id)
         users[message.from_user.id]['city'] = message.text
+        users[message.from_user.id]['city_id'] = request
 
 
 @bot.message_handler(state=Info.hotels_limit)
@@ -88,12 +93,12 @@ def photo(message: Message) -> None:
     if message.text == 'Да':
         bot.set_state(message.from_user.id, Info.photo_limit, message.chat.id)
         bot.send_message(message.chat.id, f'Сколько вы хотите вывести фотографий?\n'
-                                          f'Максимум {maximum_number_of_photos}')
+                                          f'Максимум {maximum_number_of_photos}', reply_markup=ReplyKeyboardRemove())
     elif message.text == 'Нет' and users[message.from_user.id]['command'] == '/bestdeal':
         bot.set_state(message.from_user.id, Info.min_distance, message.chat.id)
         bot.send_message(message.chat.id, 'Укажите минимальную дистанцию от центра\n'
                                           'Может быть целое или дробное число через точку\n'
-                                          'Например: 1 или 0.23')
+                                          'Например: 1 или 0.23', reply_markup=ReplyKeyboardRemove())
     elif message.text == 'Нет':
         bot.send_message(message.chat.id, display_user_info(user_data=users[message.from_user.id]),
                          reply_markup=keyboard_2())
@@ -144,5 +149,6 @@ def send_data(message: Message) -> None:
             hotels_data.clear()
 
     elif message.text == 'Начать заново':
-        bot.send_message(message.chat.id, f'Используйте команду {users[message.from_user.id]["command"]}')
+        bot.send_message(message.chat.id, f'Используйте команду {users[message.from_user.id]["command"]}',
+                         reply_markup=ReplyKeyboardRemove())
 
