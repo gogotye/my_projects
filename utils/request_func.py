@@ -1,12 +1,12 @@
+import json
 from datetime import datetime
 from typing import Any, List, Tuple
 import requests
 import re
-
 from telebot.types import Message
-
 from database.users_data import users
 from loader import bot
+from utils.variables import reg_exp_for_total_price
 
 
 def search_request(city: str, key: str) -> Any:
@@ -24,7 +24,13 @@ def search_request(city: str, key: str) -> Any:
         raise Exception('Проблема с соединением')
     else:
         if res.status_code == requests.codes.ok:
-            return res.text
+            data = json.loads(res.text)
+            try:
+                ans = data.get('sr')[0].get('gaiaId')
+            except IndexError:
+                return None
+            else:
+                return ans
         raise ConnectionError('Код ответа не равен 200')
 
 
@@ -105,11 +111,6 @@ def detail_request(id_hotel: str, key: str) -> Any:
         raise ConnectionError('Код ответа не равен 200')
 
 
-def search_id(text: str) -> str:
-    match = re.search(r'\WgaiaId\W*(\d+)\W[\w\W]*\Wtype\W*CITY\W', text)
-    return match.group(1)
-
-
 def display_user_info(user_data: dict) -> str:
     info_list = []
     for key, val in user_data.items():
@@ -159,7 +160,7 @@ def func(hotel_info: dict, hotel_detail: dict, check: bool, photo: int) -> tuple
     per_night = round(hotel_info['price']['lead']['amount'], 1), \
                 hotel_info['price']['lead']['currencyInfo']['symbol']
     symbol, per_night = per_night[1], per_night[0]
-    total = re.search(r'(\d+(?:[.,]?\d*)?)', hotel_info['price']['displayMessages'][1]['lineItems'][0]['value'])
+    total = re.search(reg_exp_for_total_price, hotel_info['price']['displayMessages'][1]['lineItems'][0]['value'])
     address = hotel_detail['data']['propertyInfo']['summary']['location']['address']['addressLine']
 
     if check:
@@ -187,13 +188,12 @@ def save_hotel_data(cur_hotel_data: tuple, flag: bool) -> dict:
 
 def from_dict_to_str(hotels: dict) -> Any:
     lst = []
-    try:
-        for i in hotels:
-            lst.append(hotels[i]['name'])
-    except KeyError:
-        return "Ничего не найдено"
+    for i in hotels:
+        lst.append(hotels.get(i, {}).get('name'))
+    if len(lst) == 0:
+        return 'Ничего не найдено'
     else:
-        return ', '.join(lst)
+        return '\n'.join(lst)
 
 
 def time() -> str:
@@ -203,7 +203,7 @@ def time() -> str:
 def db_answer(info: Tuple[int, str, str, str]):
     return f'Команда: {info[1]}\n' \
            f'Время: {info[2]}\n' \
-           f'Найденные отели: {info[3]}'
+           f'Найденные отели:\n{info[3]}'
 
 
 def check_message(message):
